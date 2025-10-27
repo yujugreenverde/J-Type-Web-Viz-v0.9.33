@@ -1219,51 +1219,133 @@ with colB:
         ax.set_xticklabels([f"{x:.{int(x_dec)}f}" for x in xticks], fontsize=x_tick_fontsize, rotation=x_tick_rotation)
 
     line_y_values = []
-    # Pairwise (Bar) – fixed stacking rule (original)
+    # --- Pairwise (Bar) fixed stacking rule ---
     if enable_sig and pair_count > 0 and plot_type.startswith("Bar") and (len(sig_pairs) > 0):
         def _get_center_top(xv, gv=None) -> Tuple[Optional[float], Optional[float]]:
             key = (str(xv), str(gv)) if gv is not None else str(xv)
             return bar_centers_map.get(key, None), bar_tops_map.get(key, None)
-
+    
         y_range_user = max(1e-12, (y_max - y_min))
-        # --- 自動上移：若樣本數顯示在上方，額外提升 pairwise 基準高度 ---
         extra_for_top_n = (float(n_top_offset_bar) + 0.01) if (show_n_labels and show_n_top_bar) else 0.0
-        
+    
+        line_y_values = []  # ✅ 重新初始化，避免重複 append
         for idx, comp in enumerate(sig_pairs):
             c1, t1 = _get_center_top(comp["x1"], comp["g1"])
             c2, t2 = _get_center_top(comp["x2"], comp["g2"])
             if c1 is None or c2 is None or t1 is None or t2 is None:
-                line_y_values.append(None); continue
+                continue
             tallest = max(t1, t2)
+            # ✅ 階梯式上移，防止重疊
             y_line = tallest + y_range_user * (sig_line_lift + extra_for_top_n + idx * sig_stack_gap)
-            needed_top = max(needed_top, y_line + y_range_user * (sig_star_extra_offset + 0.06))
             line_y_values.append((c1, c2, y_line))
-
             needed_top = max(needed_top, y_line + y_range_user * (sig_star_extra_offset + 0.06))
-            line_y_values.append((c1, c2, y_line))
+    
+    # --- Draw pairwise significance lines (Bar) ---
+    if enable_sig and pair_count > 0 and plot_type.startswith("Bar") and (len(sig_pairs) > 0):
+        # --- 確保變數存在 ---
+        try:
+            y_range_user
+        except NameError:
+            y_min, y_max = ax.get_ylim()
+            y_range_user = max(1e-12, (y_max - y_min))
+    
+        sig_line_height = locals().get("sig_line_height", 0.02)
+        sig_star_extra_offset = locals().get("sig_star_extra_offset", 0.02)
+        sig_line_width = locals().get("sig_line_width", 1.2)
+        sig_star_fontsize = locals().get("sig_star_fontsize", 12)
+        sig_star_color = locals().get("sig_star_color", "black")
+        sig_line_color = locals().get("sig_line_color", "black")
+    
+        for comp, entry in zip(sig_pairs, line_y_values):
+            if entry is None or len(entry) != 3:
+                continue
+            c1, c2, y_line = entry
+            try:
+                ax.plot(
+                    [c1, c1, c2, c2],
+                    [y_line,
+                     y_line + y_range_user * sig_line_height,
+                     y_line + y_range_user * sig_line_height,
+                     y_line],
+                    lw=float(sig_line_width),
+                    color=sig_line_color,
+                    clip_on=False
+                )
+    
+                # --- draw stars ---
+                if comp.get("p_str"):
+                    mid = (c1 + c2) / 2
+                    ax.text(
+                        mid,
+                        y_line + y_range_user * (sig_star_extra_offset + sig_line_height),
+                        comp["p_str"],
+                        ha="center", va="bottom",
+                        fontsize=float(sig_star_fontsize),
+                        color=sig_star_color,
+                        clip_on=False
+                    )
+            except Exception as e:
+                warnings.warn(f"Bar pairwise draw failed for {comp}: {e}")
 
-    # Pairwise (Box) – original stair assignment
+
+    # --- Pairwise (Box) – unified stair-gap stacking rule ---
     if enable_sig and pair_count > 0 and plot_type.startswith("Box") and (len(sig_pairs) > 0):
         x_levels = list(pd.Index(df[x_col].dropna().astype(str).unique()))
         x_index = {lvl: i for i, lvl in enumerate(x_levels)}
         box_line_triplets = []
         y_range_user = max(1e-12, (y_max - y_min))
+    
+        extra_for_top_n = (float(box_top_offset_rel) + 0.01) if (box_show_n and box_show_top) else 0.0
+        line_counter = 0
+    
         for comp in sig_pairs:
             x1 = str(comp.get("x1")); x2 = str(comp.get("x2"))
             if (x1 not in x_index) or (x2 not in x_index):
-                box_line_triplets.append(None); continue
-            t1 = df.loc[df[x_col].astype(str) == x1, y_col].max()
-            t2 = df.loc[df[x_col].astype(str) == x2, y_col].max()
-            extra_for_top_n = (float(box_top_offset_rel) + 0.01) if (box_show_n and box_show_top) else 0.0
+                box_line_triplets.append(None)
+                continue
+    
+            # --- 取該組的最高點 ---
+            try:
+                t1 = df.loc[df[x_col].astype(str) == x1, y_col].max()
+                t2 = df.loc[df[x_col].astype(str) == x2, y_col].max()
+            except Exception:
+                t1, t2 = y_max, y_max
+    
             tallest = max(t1, t2) if (pd.notna(t1) and pd.notna(t2)) else y_max
-            base = tallest + y_range_user * (sig_line_lift + extra_for_top_n)
-            box_line_triplets.append((float(x_index[x1]), float(x_index[x2]), float(base)))
+            # --- 階梯式上移（與 Bar 相同演算法） ---
+            y_line = tallest + y_range_user * (sig_line_lift + extra_for_top_n + line_counter * sig_stack_gap)
+            box_line_triplets.append((float(x_index[x1]), float(x_index[x2]), float(y_line)))
+            line_counter += 1
+            needed_top = max(needed_top, y_line + y_range_user * (sig_star_extra_offset + 0.06))
+    
+        # --- Draw pairwise significance lines (Box) ---
+        for comp, trip in zip(sig_pairs, box_line_triplets):
+            if trip is None or len(trip) != 3:
+                continue
+            a, b, y_line = trip
+            try:
+                ax.plot(
+                    [a, a, b, b],
+                    [y_line, y_line + y_range_user * sig_line_height,
+                     y_line + y_range_user * sig_line_height, y_line],
+                    lw=float(sig_line_width),
+                    color=sig_line_color,
+                    clip_on=False
+                )
+                if comp.get("p_str"):
+                    mid = (a + b) / 2
+                    ax.text(
+                        mid,
+                        y_line + y_range_user * (sig_star_extra_offset + sig_line_height),
+                        comp["p_str"],
+                        ha="center", va="bottom",
+                        fontsize=float(sig_star_fontsize),
+                        color=sig_star_color,
+                        clip_on=False
+                    )
+            except Exception as e:
+                warnings.warn(f"Box pairwise draw failed for {comp}: {e}")
 
-        pos_pairs = [(a, b) for (a, b, _) in box_line_triplets if (a is not None and b is not None)] if any(box_line_triplets) else []
-        layers = _assign_layers_for_pairs_box(pos_pairs) if pos_pairs else []
-        if layers:
-            max_layer = max(layers)
-            needed_top = max(needed_top, y_max + y_range_user*(sig_line_lift + (max_layer+1)*sig_stack_gap + sig_star_extra_offset + 0.06))
 
     y_min_plot = y_min
     y_max_plot = max(y_max, needed_top)
