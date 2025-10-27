@@ -1240,18 +1240,17 @@ with colB:
             line_y_values.append((c1, c2, y_line))
             needed_top = max(needed_top, y_line + y_range_user * (sig_star_extra_offset + 0.06))
     
-    # --- Draw pairwise significance lines (Bar) ---
-    if enable_sig and pair_count > 0 and plot_type.startswith("Bar") and (len(sig_pairs) > 0):
-        # --- 確保變數存在 ---
+    # --- Draw pairwise significance lines (Bar, single bracket version) ---
+    if enable_sig and pair_count > 0 and plot_type.startswith("Bar") and len(sig_pairs) > 0:
         try:
-            y_range_user
-        except NameError:
             y_min, y_max = ax.get_ylim()
             y_range_user = max(1e-12, (y_max - y_min))
+        except Exception:
+            y_range_user = 1.0
     
         sig_line_height = locals().get("sig_line_height", 0.02)
         sig_star_extra_offset = locals().get("sig_star_extra_offset", 0.02)
-        sig_line_width = locals().get("sig_line_width", 1.2)
+        sig_line_width = locals().get("sig_line_width", 1.6)  # 略微加粗，保持清晰
         sig_star_fontsize = locals().get("sig_star_fontsize", 12)
         sig_star_color = locals().get("sig_star_color", "black")
         sig_line_color = locals().get("sig_line_color", "black")
@@ -1260,32 +1259,31 @@ with colB:
             if entry is None or len(entry) != 3:
                 continue
             c1, c2, y_line = entry
-            try:
-                ax.plot(
-                    [c1, c1, c2, c2],
-                    [y_line,
-                     y_line + y_range_user * sig_line_height,
-                     y_line + y_range_user * sig_line_height,
-                     y_line],
-                    lw=float(sig_line_width),
-                    color=sig_line_color,
-                    clip_on=False
-                )
     
-                # --- draw stars ---
+            try:
+                # ---- 單層 ㄇ 字線 ----
+                y_top = y_line + y_range_user * sig_line_height
+                ax.plot([c1, c1, c2, c2],
+                        [y_line, y_top, y_top, y_line],
+                        lw=float(sig_line_width),
+                        color=sig_line_color,
+                        clip_on=False,
+                        zorder=10)
+    
+                # ---- 星號或 p 值 ----
                 if comp.get("p_str"):
-                    mid = (c1 + c2) / 2
-                    ax.text(
-                        mid,
-                        y_line + y_range_user * (sig_star_extra_offset + sig_line_height),
-                        comp["p_str"],
-                        ha="center", va="bottom",
-                        fontsize=float(sig_star_fontsize),
-                        color=sig_star_color,
-                        clip_on=False
-                    )
+                    mid = (c1 + c2) / 2.0
+                    ax.text(mid,
+                            y_top + y_range_user * sig_star_extra_offset,
+                            comp["p_str"],
+                            ha="center", va="bottom",
+                            fontsize=float(sig_star_fontsize),
+                            color=sig_star_color,
+                            clip_on=False,
+                            zorder=11)
             except Exception as e:
                 warnings.warn(f"Bar pairwise draw failed for {comp}: {e}")
+
 
 
     # --- Pairwise (Box) – unified stair-gap stacking rule ---
@@ -1318,33 +1316,47 @@ with colB:
             line_counter += 1
             needed_top = max(needed_top, y_line + y_range_user * (sig_star_extra_offset + 0.06))
     
-        # --- Draw pairwise significance lines (Box) ---
+        # --- Draw pairwise significance lines (Box, single bracket version) ---
         for comp, trip in zip(sig_pairs, box_line_triplets):
             if trip is None or len(trip) != 3:
                 continue
             a, b, y_line = trip
             try:
+                # 重新定義顯示參數
+                sig_line_height = locals().get("sig_line_height", 0.02)
+                sig_star_extra_offset = locals().get("sig_star_extra_offset", 0.02)
+                sig_line_width = locals().get("sig_line_width", 1.6)  # 單層線稍粗
+                sig_star_fontsize = locals().get("sig_star_fontsize", 12)
+                sig_star_color = locals().get("sig_star_color", "black")
+                sig_line_color = locals().get("sig_line_color", "black")
+        
+                # --- 單層 ㄇ 字括號 ---
+                y_top = y_line + y_range_user * sig_line_height
                 ax.plot(
                     [a, a, b, b],
-                    [y_line, y_line + y_range_user * sig_line_height,
-                     y_line + y_range_user * sig_line_height, y_line],
+                    [y_line, y_top, y_top, y_line],
                     lw=float(sig_line_width),
                     color=sig_line_color,
-                    clip_on=False
+                    clip_on=False,
+                    zorder=10
                 )
+        
+                # --- 星號或 p 值 ---
                 if comp.get("p_str"):
-                    mid = (a + b) / 2
+                    mid = (a + b) / 2.0
                     ax.text(
                         mid,
-                        y_line + y_range_user * (sig_star_extra_offset + sig_line_height),
+                        y_top + y_range_user * sig_star_extra_offset,
                         comp["p_str"],
                         ha="center", va="bottom",
                         fontsize=float(sig_star_fontsize),
                         color=sig_star_color,
-                        clip_on=False
+                        clip_on=False,
+                        zorder=11
                     )
             except Exception as e:
                 warnings.warn(f"Box pairwise draw failed for {comp}: {e}")
+
 
 
     y_min_plot = y_min
