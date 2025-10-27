@@ -1504,6 +1504,20 @@ with colC:
         pass
 
     st.pyplot(fig, clear_figure=False)
+    # --- build PNG buffer for enlarged preview ---
+    import io
+    _png_buf = io.BytesIO()
+    try:
+        # 確保圖已渲染，再存成 PNG
+        fig.canvas.draw()
+        fig.savefig(_png_buf, format="png", dpi=200, bbox_inches="tight")
+        _png_bytes = _png_buf.getvalue()
+    
+        with st.expander("🔎 放大預覽（非全螢幕）", expanded=False):
+            st.image(_png_bytes, caption="Large preview", use_container_width=True)
+    except Exception as e:
+        st.warning(f"預覽圖片產生失敗：{e}")
+
 
     ts = datetime.now().strftime("%Y%m%d_%H%M")
     base_name = f"{sanitize_filename(ylabel)}_{sanitize_filename(xlabel)}"
