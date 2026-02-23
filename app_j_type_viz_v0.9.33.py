@@ -1138,10 +1138,16 @@ with colB:
                            .describe()[["count", "mean", "std", "min", "25%", "50%", "75%", "max"]]
                            .reset_index())
         ax.set_xlabel(x_col); ax.set_ylabel(y_col)
-        # --- Apply custom X label mapping (Box) ---
-        current_labels = [tick.get_text() for tick in ax.get_xticklabels()]
-        new_labels = [label_map.get(str(lbl), str(lbl)) for lbl in current_labels]
-        ax.set_xticklabels(new_labels, rotation=x_tick_rotation, fontsize=x_tick_fontsize)
+        # --- Apply custom X label mapping (Box safe) ---
+        if label_map:
+            current_labels = [tick.get_text() for tick in ax.get_xticklabels()]
+            new_labels = [label_map.get(str(lbl), str(lbl)) for lbl in current_labels]
+            ax.set_xticklabels(new_labels)
+        
+        # --- Force apply tick styling (prevents seaborn override) ---
+        for tick in ax.get_xticklabels():
+            tick.set_fontsize(x_tick_fontsize)
+            tick.set_rotation(x_tick_rotation)
 
     # --- SCATTER ---
     else:
