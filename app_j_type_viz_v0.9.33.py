@@ -1139,23 +1139,9 @@ with colB:
                            .reset_index())
         ax.set_xlabel(x_col); ax.set_ylabel(y_col)
         # --- Apply custom X label mapping (Box) ---
-        try:
-            current_labels = [tick.get_text() for tick in ax.get_xticklabels()]
-            new_labels = [label_map.get(str(lbl), str(lbl)) for lbl in current_labels]
-            ax.set_xticklabels(new_labels, rotation=x_tick_rotation, fontsize=x_tick_fontsize)
-        except Exception:
-            pass
-                # X tick vertical offset (visual n-label spacing)
-                try:
-                    if plot_type.startswith("Box") and box_xtick_offset_rel > 0:
-                        y_min_val, y_max_val = ax.get_ylim()
-                        y_range = max(1e-12, (y_max_val - y_min_val))
-                        offset_val = y_range * box_xtick_offset_rel
-                        for label in ax.get_xticklabels():
-                            pos = label.get_position()
-                            label.set_position((pos[0], pos[1] - offset_val / y_range))
-                except Exception as e:
-                    warnings.warn(f"Box X tick reposition failed: {e}")
+        current_labels = [tick.get_text() for tick in ax.get_xticklabels()]
+        new_labels = [label_map.get(str(lbl), str(lbl)) for lbl in current_labels]
+        ax.set_xticklabels(new_labels, rotation=x_tick_rotation, fontsize=x_tick_fontsize)
 
     # --- SCATTER ---
     else:
