@@ -1138,13 +1138,13 @@ with colB:
                            .describe()[["count", "mean", "std", "min", "25%", "50%", "75%", "max"]]
                            .reset_index())
         ax.set_xlabel(x_col); ax.set_ylabel(y_col)
-        # --- Apply custom X label mapping (Box safe) ---
-        if label_map:
-            current_labels = [tick.get_text() for tick in ax.get_xticklabels()]
-            new_labels = [label_map.get(str(lbl), str(lbl)) for lbl in current_labels]
-            ax.set_xticklabels(new_labels)
+        # --- HARD FIX: lock categorical ticks (Box mode) ---
+        xticks = ax.get_xticks()
+        xticklabels = [tick.get_text() for tick in ax.get_xticklabels()]
         
-        # --- Force apply tick styling (prevents seaborn override) ---
+        ax.set_xticks(xticks)
+        ax.set_xticklabels(xticklabels)
+        
         for tick in ax.get_xticklabels():
             tick.set_fontsize(x_tick_fontsize)
             tick.set_rotation(x_tick_rotation)
