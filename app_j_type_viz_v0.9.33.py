@@ -1,6 +1,6 @@
-# J-type-like Web Viz (v0.9.33)
+# J-type-like Web Viz (v0.9.35)
 # ---------------------------------------------------
-# Changelog (from v0.9.30 -> v0.9.33):
+# Changelog (from v0.9.30 -> v0.9.35):
 # 1) 新增 Mode 切換（Basic / Advanced），Basic 僅顯示常用設定；Advanced 顯示完整控制。
 # 2) pairwise 線避重邏輯維持原設定（固定間距 + 手動參數）。
 # 3) Bar 與 Box 圖皆支援同時顯示上下 (n=xx)，提供獨立顏色與 alpha 控制。
@@ -337,7 +337,7 @@ mode = st.radio("Mode", ["Basic", "Advanced"], horizontal=True, index=0)
 # --- CSS：修正 scroll-col 無法輸入問題 ---
 st.markdown("""
 <style>
-scroll-col {
+.scroll-col {
     max-height: 90vh;           /* 固定高度，允許滾動 */
     overflow-y: auto;
     padding-right: 0.8rem;
@@ -1243,112 +1243,8 @@ with colB:
             # ✅ 階梯式上移，防止重疊
             y_line = tallest + y_range_user * (sig_line_lift + extra_for_top_n + idx * sig_stack_gap)
             line_y_values.append((c1, c2, y_line))
-            needed_top = max(needed_top, y_line + y_range_user * (sig_star_extra_offset + 0.06))
+            needed_top = max(needed_top, y_line + y_range_user * (sig_star_extra_offset + 0.03))
     
-    # --- Draw pairwise significance lines (Bar, single bracket, default transparent) ---
-    if enable_sig and pair_count > 0 and plot_type.startswith("Bar") and len(sig_pairs) > 0:
-        try:
-            y_min, y_max = ax.get_ylim()
-            y_range_user = max(1e-12, (y_max - y_min))
-        except Exception:
-            y_range_user = 1.0
-    
-        sig_line_height = locals().get("sig_line_height", 0.02)
-        sig_star_extra_offset = locals().get("sig_star_extra_offset", 0.02)
-        sig_line_width = locals().get("sig_line_width", 1.6)
-        sig_star_fontsize = locals().get("sig_star_fontsize", 12)
-        sig_star_color = locals().get("sig_star_color", "black")
-        sig_line_color = locals().get("sig_line_color", "black")
-        sig_line_alpha = float(locals().get("sig_line_alpha", 0.0))  # ← 預設透明
-    
-        for comp, entry in zip(sig_pairs, line_y_values):
-            if entry is None or len(entry) != 3:
-                continue
-            c1, c2, y_line = entry
-            try:
-                y_top = y_line + y_range_user * sig_line_height
-                ax.plot([c1, c1, c2, c2],
-                        [y_line, y_top, y_top, y_line],
-                        lw=float(sig_line_width),
-                        color=_rgba(sig_line_color, sig_line_alpha),
-                        clip_on=False, zorder=10)
-                if comp.get("p_str"):
-                    mid = (c1 + c2) / 2.0
-                    ax.text(mid,
-                            y_top + y_range_user * sig_star_extra_offset,
-                            comp["p_str"],
-                            ha="center", va="bottom",
-                            fontsize=float(sig_star_fontsize),
-                            color=sig_star_color,
-                            clip_on=False, zorder=11)
-            except Exception as e:
-                warnings.warn(f"Bar pairwise draw failed for {comp}: {e}")
-
-
-
-    # --- Pairwise (Box) – unified stair-gap stacking rule ---
-    if enable_sig and pair_count > 0 and plot_type.startswith("Box") and (len(sig_pairs) > 0):
-        x_levels = list(pd.Index(df[x_col].dropna().astype(str).unique()))
-        x_index = {lvl: i for i, lvl in enumerate(x_levels)}
-        box_line_triplets = []
-        y_range_user = max(1e-12, (y_max - y_min))
-    
-        extra_for_top_n = (float(box_top_offset_rel) + 0.01) if (box_show_n and box_show_top) else 0.0
-        line_counter = 0
-    
-        for comp in sig_pairs:
-            x1 = str(comp.get("x1")); x2 = str(comp.get("x2"))
-            if (x1 not in x_index) or (x2 not in x_index):
-                box_line_triplets.append(None)
-                continue
-    
-            # --- 取該組的最高點 ---
-            try:
-                t1 = df.loc[df[x_col].astype(str) == x1, y_col].max()
-                t2 = df.loc[df[x_col].astype(str) == x2, y_col].max()
-            except Exception:
-                t1, t2 = y_max, y_max
-    
-            tallest = max(t1, t2) if (pd.notna(t1) and pd.notna(t2)) else y_max
-            # --- 階梯式上移（與 Bar 相同演算法） ---
-            y_line = tallest + y_range_user * (sig_line_lift + extra_for_top_n + line_counter * sig_stack_gap)
-            box_line_triplets.append((float(x_index[x1]), float(x_index[x2]), float(y_line)))
-            line_counter += 1
-            needed_top = max(needed_top, y_line + y_range_user * (sig_star_extra_offset + 0.06))
-    
-        # --- Draw pairwise significance lines (Box, single bracket, default transparent) ---
-        for comp, trip in zip(sig_pairs, box_line_triplets):
-            if trip is None or len(trip) != 3:
-                continue
-            a, b, y_line = trip
-            try:
-                sig_line_height = locals().get("sig_line_height", 0.02)
-                sig_star_extra_offset = locals().get("sig_star_extra_offset", 0.02)
-                sig_line_width = locals().get("sig_line_width", 1.6)
-                sig_star_fontsize = locals().get("sig_star_fontsize", 12)
-                sig_star_color = locals().get("sig_star_color", "black")
-                sig_line_color = locals().get("sig_line_color", "black")
-                sig_line_alpha = float(locals().get("sig_line_alpha", 0.0))  # ← 預設透明
-        
-                y_top = y_line + y_range_user * sig_line_height
-                ax.plot([a, a, b, b],
-                        [y_line, y_top, y_top, y_line],
-                        lw=float(sig_line_width),
-                        color=_rgba(sig_line_color, sig_line_alpha),
-                        clip_on=False, zorder=10)
-        
-                if comp.get("p_str"):
-                    mid = (a + b) / 2.0
-                    ax.text(mid,
-                            y_top + y_range_user * sig_star_extra_offset,
-                            comp["p_str"],
-                            ha="center", va="bottom",
-                            fontsize=float(sig_star_fontsize),
-                            color=sig_star_color,
-                            clip_on=False, zorder=11)
-            except Exception as e:
-                warnings.warn(f"Box pairwise draw failed for {comp}: {e}")
-
 
 
 
@@ -1413,7 +1309,8 @@ with colB:
             entry = None if idx >= len(line_y_values) else line_y_values[idx]
             if entry is None: continue
             c1, c2, y_line = entry
-            stars_raw = p_to_stars(comp.get("p", ""), thr_1, thr_2, thr_3, show_ns=(not hide_ns))
+            pval = comp.get("p", "")
+            stars_raw = p_to_stars(pval, thr_1, thr_2, thr_3, show_ns=(not hide_ns))
             if hide_ns and (stars_raw == "ns") and (isinstance(comp.get("p", ""), str) and comp.get("p", "").strip().lower() != "ns"):
                 continue
             stars = stars_raw if stars_raw else str(comp.get("p", "")).strip()
@@ -1539,9 +1436,6 @@ with colC:
         plt.rcParams["figure.dpi"] = 300 if style_preset == "Publication-ready" else 200
         st.sidebar.caption("Preset applied: Okabe–Ito palette + clean axes/grid.")
 
-    x_label_rotation = st.slider("X-axis label rotation (°)", min_value=0, max_value=90, value=0, step=5)
-    for _ax in fig.axes:
-        apply_x_label_rotation(_ax, x_label_rotation)
 
     # --- Export PDF/PNG/SVG ---
     pdf_buf = io.BytesIO()
