@@ -1238,7 +1238,37 @@ with colB:
 
     # Axis & stats (post drawing)
     ax.set_title(main_title, fontweight=fontweight)
-
+    # --- 🔢 Draw manual stats annotation ---
+    if show_stats:
+        stat_lines = []
+    
+        if t_in.strip():
+            stat_lines.append(f"t = {t_in.strip()}")
+        if f_in.strip():
+            stat_lines.append(f"F = {f_in.strip()}")
+        if p_in.strip():
+            stat_lines.append(f"p = {p_in.strip()}")
+        if note_in.strip():
+            stat_lines.append(note_in.strip())
+    
+        if stat_lines:
+            text = "\n".join(stat_lines)
+    
+            # 位置控制
+            x_pos = 0.02 if "left" in position else 0.98
+            y_pos = 0.98 if "top" in position else 0.02
+            ha = "left" if "left" in position else "right"
+            va = "top" if "top" in position else "bottom"
+    
+            ax.text(
+                x_pos, y_pos,
+                text,
+                transform=ax.transAxes,
+                fontsize=stat_font_size,
+                color=stat_color,
+                ha=ha,
+                va=va
+            )
     if plot_type.startswith("Scatter") and 'x_min' in locals():
         ax.set_xlim(x_min, x_max)
         xticks = np.arange(x_min, x_max + 1e-9, x_step if 'x_step' in locals() else 1.0)
