@@ -1,6 +1,6 @@
-# J-type-like Web Viz (v0.9.35)
+# J-type-like Web Viz (v0.9.33)
 # ---------------------------------------------------
-# Changelog (from v0.9.30 -> v0.9.35):
+# Changelog (from v0.9.30 -> v0.9.33):
 # 1) 新增 Mode 切換（Basic / Advanced），Basic 僅顯示常用設定；Advanced 顯示完整控制。
 # 2) pairwise 線避重邏輯維持原設定（固定間距 + 手動參數）。
 # 3) Bar 與 Box 圖皆支援同時顯示上下 (n=xx)，提供獨立顏色與 alpha 控制。
@@ -454,6 +454,7 @@ with colA:
 
     # ---------- BOX ----------
     elif plot_type.startswith("Box"):
+
         x_col = st.selectbox("X (categorical)", (cat_cols or df.columns.tolist()), key="box_x")
         y_col = st.selectbox("Y (numeric)", (numeric_cols or df.columns.tolist()), key="box_y")
         show_points = st.checkbox("Show individual sample points", True)
@@ -991,12 +992,23 @@ with colB:
 
     # --- BOX ---
     elif plot_type.startswith("Box"):
+        # --- 🔒 Ensure categorical order consistency (v0.9.35 fix) ---
+        if custom_order:
+            df[x_col] = pd.Categorical(
+                df[x_col].astype(str),
+                categories=custom_order,
+                ordered=True
+            )
         try:
             import seaborn as sns
             sns.set_theme(style="whitegrid")
             if group_col in (None, "None"):
                 sns.boxplot(
-                    data=df, x=x_col, y=y_col, ax=ax,
+                    data=df,
+                    x=x_col,
+                    y=y_col,
+                    order=custom_order if custom_order else None,
+                    ax=ax,
                     fliersize=0, widths=box_width,
                     boxprops=dict(facecolor=box_fill_color, alpha=box_alpha, edgecolor=box_edge_color, linewidth=box_edge_lw),
                     whiskerprops=dict(color=box_edge_color, linewidth=box_edge_lw),
@@ -1012,7 +1024,12 @@ with colB:
             else:
                 palette = {str(k): v for k, v in group_colors.items() if k is not None}
                 sns.boxplot(
-                    data=df, x=x_col, y=y_col, hue=group_col, ax=ax,
+                    data=df,
+                    x=x_col,
+                    y=y_col,
+                    hue=group_col,
+                    order=custom_order if custom_order else None,
+                    ax=ax,
                     palette=palette if palette else None,
                     fliersize=0, widths=box_width,
                     boxprops=dict(facecolor=box_fill_color, alpha=box_alpha, edgecolor=box_edge_color, linewidth=box_edge_lw),
@@ -1104,7 +1121,10 @@ with colB:
 
         except Exception as e:
             warnings.warn(f"Seaborn not available or failed ({e}), falling back to matplotlib boxplot).")
-            cats = list(pd.Index(df[x_col].dropna().astype(str).unique()))
+            if custom_order:
+                cats = custom_order
+            else:
+                cats = list(pd.Index(df[x_col].dropna().astype(str).unique()))
             data = [df.loc[df[x_col].astype(str) == c, y_col].dropna().to_numpy() for c in cats]
             bp = ax.boxplot(data, positions=np.arange(len(cats)),
                             widths=box_width, showfliers=False, patch_artist=True)
@@ -1486,7 +1506,7 @@ with colC:
         except Exception:
             return str(col)
     
-    rename_map = locals().get("rename_map", {})
+    
     x_raw, y_raw, g_raw = str(x_col), str(y_col), (str(group_col) if group_col not in (None, "None") else None)
     x_renamed = safe_name(x_col, rename_map, False)
     y_renamed = safe_name(y_col, rename_map, False)
