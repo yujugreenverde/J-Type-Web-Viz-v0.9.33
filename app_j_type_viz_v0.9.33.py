@@ -161,16 +161,18 @@ def p_to_stars(value, thr1=0.05, thr2=0.01, thr3=0.001, show_ns=False) -> str:
     return "ns" if show_ns else ""
 
 
-# 🔹 這裡要回到最左邊（和上面同層）
 import re
 
 def format_stat_annotation(t_in="", f_in="", p_in="", note_in=""):
     parts = []
 
+    # =========================
+    # t statistic
+    # =========================
     if t_in.strip():
         t_raw = t_in.strip()
-    
-        # --- 情況 1：有 df，例如 12=2.31 或 (12)=2.31 ---
+
+        # 情況 1：有 df，例如 12=2.31 或 (12)=2.31
         if "=" in t_raw:
             match = re.match(r"\(?\s*(\d+)\s*\)?\s*=\s*([-+]?\d*\.?\d+)", t_raw)
             if match:
@@ -179,9 +181,11 @@ def format_stat_annotation(t_in="", f_in="", p_in="", note_in=""):
                     rf"$\mathit{{t}}({df_val})={float(t_val):.2f}$"
                 )
             else:
-                parts.append(rf"$\mathit{{t}}={t_raw}$")
-    
-        # --- 情況 2：只有 t 值，例如 1.2 ---
+                parts.append(
+                    rf"$\mathit{{t}}={t_raw}$"
+                )
+
+        # 情況 2：只有 t 值，例如 1.2
         else:
             try:
                 t_val = float(t_raw)
@@ -189,27 +193,62 @@ def format_stat_annotation(t_in="", f_in="", p_in="", note_in=""):
                     rf"$\mathit{{t}}={t_val:.2f}$"
                 )
             except ValueError:
-                parts.append(rf"$\mathit{{t}}={t_raw}$")
+                parts.append(
+                    rf"$\mathit{{t}}={t_raw}$"
+                )
+
+    # =========================
+    # F statistic
+    # =========================
     if f_in.strip():
         f_raw = f_in.strip()
-        match = re.match(r"\(?\s*([\d, ]+)\s*\)?\s*=?\s*([-\d\.]+)", f_raw)
-        if match:
-            df_part, f_val = match.groups()
-            df_part = df_part.replace(" ", "")
-            parts.append(rf"$\it{{F}}({df_part})={float(f_val):.2f}$")
-        else:
-            parts.append(rf"$\it{{F}}={f_raw}$")
 
+        # 有 df，例如 1,12=4.56 或 (1,12)=4.56
+        if "=" in f_raw:
+            match = re.match(r"\(?\s*([\d,\s]+)\s*\)?\s*=\s*([-+]?\d*\.?\d+)", f_raw)
+            if match:
+                df_part, f_val = match.groups()
+                df_part = df_part.replace(" ", "")
+                parts.append(
+                    rf"$\mathit{{F}}({df_part})={float(f_val):.2f}$"
+                )
+            else:
+                parts.append(
+                    rf"$\mathit{{F}}={f_raw}$"
+                )
+        else:
+            try:
+                f_val = float(f_raw)
+                parts.append(
+                    rf"$\mathit{{F}}={f_val:.2f}$"
+                )
+            except ValueError:
+                parts.append(
+                    rf"$\mathit{{F}}={f_raw}$"
+                )
+
+    # =========================
+    # p value
+    # =========================
     if p_in.strip():
         try:
             p_val = float(p_in.strip())
-            if p_val < 0.001:
-                parts.append(r"$\it{p}<0.001$")
-            else:
-                parts.append(rf"$\it{{p}}={p_val:.3f}$")
-        except Exception:
-            parts.append(rf"$\it{{p}}={p_in.strip()}$")
 
+            if p_val < 0.001:
+                parts.append(r"$\mathit{p}<0.001$")
+            else:
+                parts.append(
+                    rf"$\mathit{{p}}={p_val:.3f}$"
+                )
+
+        except ValueError:
+            parts.append(
+                rf"$\mathit{{p}}={p_in.strip()}$"
+            )
+
+    # =========================
+    # Additional note
+    # =========================
     if note_in.strip():
         parts.append(note_in.strip())
 
