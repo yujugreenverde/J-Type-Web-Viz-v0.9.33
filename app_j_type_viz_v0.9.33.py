@@ -1158,16 +1158,15 @@ with colB:
                            .describe()[["count", "mean", "std", "min", "25%", "50%", "75%", "max"]]
                            .reset_index())
         ax.set_xlabel(x_col); ax.set_ylabel(y_col)
-        # --- HARD FIX: lock categorical ticks (Box mode) ---
+        # --- FIX: apply custom X labels in Box mode ---
         xticks = ax.get_xticks()
-        xticklabels = [tick.get_text() for tick in ax.get_xticklabels()]
+        current_labels = [tick.get_text() for tick in ax.get_xticklabels()]
+        
+        # 使用 label_map 重新映射
+        new_labels = [label_map.get(str(lbl), str(lbl)) for lbl in current_labels]
         
         ax.set_xticks(xticks)
-        ax.set_xticklabels(xticklabels)
-        
-        for tick in ax.get_xticklabels():
-            tick.set_fontsize(x_tick_fontsize)
-            tick.set_rotation(x_tick_rotation)
+        ax.set_xticklabels(new_labels, fontsize=x_tick_fontsize, rotation=x_tick_rotation)
 
     # --- SCATTER ---
     else:
