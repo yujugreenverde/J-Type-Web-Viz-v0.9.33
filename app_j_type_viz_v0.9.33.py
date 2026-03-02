@@ -169,7 +169,10 @@ def format_stat_annotation(t_in="", f_in="", p_in="", note_in=""):
 
     if t_in.strip():
         t_raw = t_in.strip()
-        match = re.match(r"\(?\s*(\d+)\s*\)?\s*=?\s*([-\d\.]+)", t_raw)
+        if "=" in t_raw:
+            match = re.match(r"\(?\s*(\d+)\s*\)?\s*=\s*([-\d\.]+)", t_raw)
+        else:
+            match = None
         if match:
             df_val, t_val = match.groups()
             parts.append(rf"$\it{{t}}({df_val})={float(t_val):.2f}$")
