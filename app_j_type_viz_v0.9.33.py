@@ -233,7 +233,10 @@ def _compute_category_counts(df, x_col, group_col=None):
         n_list = [int(counts.get(lbl, 0)) for lbl in levels]
         return positions, levels, n_list
     else:
-        x_levels = list(pd.Index(df[x_col].dropna().astype(str).unique()))
+        if hasattr(df[x_col].dtype, "categories"):
+            x_levels = list(df[x_col].cat.categories)
+        else:
+            x_levels = list(pd.Index(df[x_col].dropna().astype(str).unique()))
         counts = df[x_col].dropna().astype(str).value_counts()
         positions = list(range(len(x_levels)))
         n_list = [int(counts.get(lbl, 0)) for lbl in x_levels]
@@ -1321,7 +1324,10 @@ with colB:
 
     ax.set_xlabel(xlabel, labelpad=xlabel_pad, fontweight=fontweight)
     ax.set_ylabel(ylabel, fontweight=fontweight)
-
+    # --- 🔧 Final X tick style enforcement ---
+    for tick in ax.get_xticklabels():
+        tick.set_fontsize(x_tick_fontsize)
+        tick.set_rotation(x_tick_rotation)
     # Draw pairwise lines (Bar)
     if enable_sig and pair_count > 0 and plot_type.startswith("Bar") and (len(sig_pairs) > 0):
         for idx, comp in enumerate(sig_pairs):
