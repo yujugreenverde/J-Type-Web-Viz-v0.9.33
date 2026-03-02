@@ -160,6 +160,47 @@ def p_to_stars(value, thr1=0.05, thr2=0.01, thr3=0.001, show_ns=False) -> str:
         return "*"
     return "ns" if show_ns else ""
 
+
+# 🔹 這裡要回到最左邊（和上面同層）
+import re
+
+def format_stat_annotation(t_in="", f_in="", p_in="", note_in=""):
+    parts = []
+
+    if t_in.strip():
+        t_raw = t_in.strip()
+        match = re.match(r"\(?\s*(\d+)\s*\)?\s*=?\s*([-\d\.]+)", t_raw)
+        if match:
+            df_val, t_val = match.groups()
+            parts.append(rf"$\it{{t}}({df_val})={float(t_val):.2f}$")
+        else:
+            parts.append(rf"$\it{{t}}={t_raw}$")
+
+    if f_in.strip():
+        f_raw = f_in.strip()
+        match = re.match(r"\(?\s*([\d, ]+)\s*\)?\s*=?\s*([-\d\.]+)", f_raw)
+        if match:
+            df_part, f_val = match.groups()
+            df_part = df_part.replace(" ", "")
+            parts.append(rf"$\it{{F}}({df_part})={float(f_val):.2f}$")
+        else:
+            parts.append(rf"$\it{{F}}={f_raw}$")
+
+    if p_in.strip():
+        try:
+            p_val = float(p_in.strip())
+            if p_val < 0.001:
+                parts.append(r"$\it{p}<0.001$")
+            else:
+                parts.append(rf"$\it{{p}}={p_val:.3f}$")
+        except Exception:
+            parts.append(rf"$\it{{p}}={p_in.strip()}$")
+
+    if note_in.strip():
+        parts.append(note_in.strip())
+
+    return ", ".join(parts)
+
 # --- sync whisker caps (讓帽子線寬 = Box 寬) ---
 def sync_whisker_caps_to_boxwidth(bp, box_width=0.6, cap_lw=None, cap_color=None):
     if not bp or "caps" not in bp:
@@ -1238,23 +1279,11 @@ with colB:
 
     # Axis & stats (post drawing)
     ax.set_title(main_title, fontweight=fontweight)
-    # --- 🔢 Draw manual stats annotation ---
+    # --- 🔢 Journal-style stats annotation ---
     if show_stats:
-        stat_lines = []
+        text = format_stat_annotation(t_in, f_in, p_in, note_in)
     
-        if t_in.strip():
-            stat_lines.append(f"t = {t_in.strip()}")
-        if f_in.strip():
-            stat_lines.append(f"F = {f_in.strip()}")
-        if p_in.strip():
-            stat_lines.append(f"p = {p_in.strip()}")
-        if note_in.strip():
-            stat_lines.append(note_in.strip())
-    
-        if stat_lines:
-            text = "\n".join(stat_lines)
-    
-            # 位置控制
+        if text:
             x_pos = 0.02 if "left" in position else 0.98
             y_pos = 0.98 if "top" in position else 0.02
             ha = "left" if "left" in position else "right"
@@ -1269,6 +1298,7 @@ with colB:
                 ha=ha,
                 va=va
             )
+    
     if plot_type.startswith("Scatter") and 'x_min' in locals():
         ax.set_xlim(x_min, x_max)
         xticks = np.arange(x_min, x_max + 1e-9, x_step if 'x_step' in locals() else 1.0)
