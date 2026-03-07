@@ -696,6 +696,9 @@ with colB:
     xlabel = st.text_input("X-axis label", value=x_col)
     ylabel = st.text_input("Y-axis label", value=y_col)
     font_size = st.slider("Base font size", 8, 24, 12)
+    title_fontsize = st.slider("Title fontsize", 6, 40, 14)
+    xlabel_fontsize = st.slider("X label fontsize", 6, 40, 12)
+    ylabel_fontsize = st.slider("Y label fontsize", 6, 40, 12)
     bold = st.checkbox("Bold axis labels", False)
 
     x_tick_rotation = st.slider("X tick rotation (deg)", 0, 90, 0)
@@ -1331,7 +1334,7 @@ with colB:
 
 
     # Axis & stats (post drawing)
-    ax.set_title(main_title, fontweight=fontweight)
+    ax.set_title(main_title, fontweight=fontweight, fontsize=title_fontsize)
     # --- 🔢 Journal-style stats annotation ---
     if show_stats:
         text = format_stat_annotation(t_in, f_in, p_in, note_in)
@@ -1435,8 +1438,17 @@ with colB:
         n_cats = len(xpos)
         ax.set_xlim(-0.5, n_cats - 0.5)  # 原來用 inch margin，簡化到類別邊界視覺更穩定
 
-    ax.set_xlabel(xlabel, labelpad=xlabel_pad, fontweight=fontweight)
-    ax.set_ylabel(ylabel, fontweight=fontweight)
+    ax.set_xlabel(
+        xlabel,
+        labelpad=xlabel_pad,
+        fontweight=fontweight,
+        fontsize=xlabel_fontsize
+    )
+    ax.set_ylabel(
+        ylabel,
+        fontweight=fontweight,
+        fontsize=ylabel_fontsize
+    )
     # --- 🔧 Final X tick style enforcement ---
     for tick in ax.get_xticklabels():
         tick.set_fontsize(x_tick_fontsize)
