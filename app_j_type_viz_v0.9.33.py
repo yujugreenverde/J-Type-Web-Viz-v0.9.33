@@ -1,4 +1,4 @@
-# J-type-like Web Viz (v0.9.35)
+# J-type-like Web Viz (v0.9.33)
 # ---------------------------------------------------
 # Changelog (from v0.9.30 -> v0.9.33):
 # 1) 新增 Mode 切換（Basic / Advanced），Basic 僅顯示常用設定；Advanced 顯示完整控制。
@@ -6,22 +6,17 @@
 # 3) Bar 與 Box 圖皆支援同時顯示上下 (n=xx)，提供獨立顏色與 alpha 控制。
 # 4) 預設套用 Publication-ready 風格；Style preset 預設為 "Publication-ready"。
 #
-# 5) 新增匯出參數報表（JSON/TXT），並自動打包進 ALL.zip，方便可重現與追溯。
-#
-# 其餘功能皆沿用 v0.9.33。
+# 其餘功能（Bar/Box/Scatter/導出/summary/向量字體/Okabe–Ito 等）皆沿用 v0.9.30。
 
 from matplotlib import cycler as _cycler
 import streamlit as st
 from matplotlib.backends.backend_pdf import PdfPages
 import matplotlib.pyplot as plt
-import io, math, re, warnings, json, sys, platform
+import io, math, re, warnings
 from datetime import datetime
 from typing import Optional, Tuple, Dict, Any, List, Union
 import numpy as np
 import pandas as pd
-
-APP_VERSION = "0.9.35"
-
 import matplotlib
 matplotlib.use("Agg")
 
@@ -311,175 +306,6 @@ def sanitize_filename(s: str) -> str:
     s = re.sub(r'[_-]{2,}', lambda m: m.group(0)[0], s)
     s = s.strip("_-")
     return s or "Figure"
-def _safe_serialize(obj: Any, *, _depth: int = 0, _max_depth: int = 5) -> Any:
-    """Best-effort JSON-safe serializer for parameter reports.
-
-    - Avoids blowing up on non-serializable objects (fig/ax/df, etc.)
-    - Truncates deeply nested structures.
-    """
-    if _depth > _max_depth:
-        return f"<max_depth:{_max_depth}>"
-
-    # Simple primitives
-    if obj is None or isinstance(obj, (bool, int, float, str)):
-        return obj
-
-    # Numpy
-    try:
-        import numpy as _np  # already imported globally; keep local for safety
-        if isinstance(obj, _np.generic):
-            return obj.item()
-        if isinstance(obj, _np.ndarray):
-            return {
-                "__type__": "ndarray",
-                "shape": list(obj.shape),
-                "dtype": str(obj.dtype),
-            }
-    except Exception:
-        pass
-
-    # Pandas
-    try:
-        import pandas as _pd  # already imported globally; keep local for safety
-        if isinstance(obj, _pd.DataFrame):
-            return {
-                "__type__": "DataFrame",
-                "shape": [int(obj.shape[0]), int(obj.shape[1])],
-                "columns": [str(c) for c in obj.columns[:200]],
-            }
-        if isinstance(obj, _pd.Series):
-            return {
-                "__type__": "Series",
-                "shape": [int(obj.shape[0])],
-                "name": str(obj.name),
-            }
-        if isinstance(obj, _pd.Index):
-            return {
-                "__type__": "Index",
-                "shape": [int(obj.shape[0])],
-                "name": str(obj.name),
-            }
-    except Exception:
-        pass
-
-    # Dict-like
-    if isinstance(obj, dict):
-        out = {}
-        for k, v in list(obj.items())[:500]:
-            out[str(k)] = _safe_serialize(v, _depth=_depth + 1, _max_depth=_max_depth)
-        if len(obj) > 500:
-            out["__truncated__"] = f"{len(obj) - 500} keys omitted"
-        return out
-
-    # List/Tuple/Set
-    if isinstance(obj, (list, tuple, set)):
-        seq = list(obj)
-        out = [_safe_serialize(v, _depth=_depth + 1, _max_depth=_max_depth) for v in seq[:1000]]
-        if len(seq) > 1000:
-            out.append(f"<truncated:{len(seq)-1000} items>")
-        return out
-
-    # Fallback: class name / repr (short)
-    try:
-        r = repr(obj)
-        if len(r) > 300:
-            r = r[:297] + "..."
-        return {"__type__": type(obj).__name__, "repr": r}
-    except Exception:
-        return {"__type__": type(obj).__name__}
-
-
-def build_param_report(*, locals_dict: Dict[str, Any], extra: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """Build a reproducible parameter report.
-
-    NOTE: We intentionally snapshot *serializable* session_state only; heavy objects are summarized.
-    """
-    # Session snapshot (best-effort)
-    try:
-        ss_raw = dict(st.session_state)
-    except Exception:
-        ss_raw = {}
-
-    ss = _safe_serialize(ss_raw)
-
-    # Key meta from locals (best-effort)
-    meta = {
-        "app": "J-type-like Web Viz",
-        "app_version": APP_VERSION,
-        "generated_at": datetime.now().isoformat(timespec="seconds"),
-        "python": sys.version.split()[0],
-        "platform": platform.platform(),
-        "streamlit": getattr(st, "__version__", "unknown"),
-    }
-
-    # Keep only a curated subset of locals if present (avoid dumping everything)
-    keys_of_interest = [
-        "plot_type", "x_col", "y_col", "group_col", "xlabel", "ylabel",
-        "style_preset", "enable_pub_style", "png_dpi",
-        "rename_map", "use_raw_names", "caption_style", "stat_indicator", "auto_caption",
-    ]
-    used = {}
-    for k in keys_of_interest:
-        if k in locals_dict:
-            used[k] = _safe_serialize(locals_dict.get(k))
-
-    # Data meta
-    if "df" in locals_dict:
-        used["data"] = _safe_serialize(locals_dict["df"])
-    if "summary_table" in locals_dict and locals_dict.get("summary_table") is not None:
-        used["summary_table"] = _safe_serialize(locals_dict.get("summary_table"))
-
-    report = {
-        "meta": meta,
-        "used_parameters": used,
-        "session_state": ss,
-    }
-    if extra:
-        report["extra"] = _safe_serialize(extra)
-    return report
-
-
-def report_to_txt(report: Dict[str, Any]) -> str:
-    """Human-readable report text (for Notion / lab notes)."""
-    meta = report.get("meta", {})
-    used = report.get("used_parameters", {})
-
-    lines = []
-    lines.append("J-type-like Web Viz — Parameter Report")
-    lines.append("=" * 40)
-    lines.append(f"App: {meta.get('app','')}")
-    lines.append(f"Version: {meta.get('app_version','')}")
-    lines.append(f"Generated at: {meta.get('generated_at','')}")
-    lines.append(f"Python: {meta.get('python','')}")
-    lines.append(f"Platform: {meta.get('platform','')}")
-    lines.append(f"Streamlit: {meta.get('streamlit','')}")
-    lines.append("")
-
-    lines.append("Used parameters")
-    lines.append("-" * 40)
-    for k in sorted(used.keys()):
-        v = used[k]
-        if isinstance(v, dict) and "__type__" in v and len(v) <= 6:
-            lines.append(f"{k}: {v}")
-        else:
-            # pretty one-liner
-            s = json.dumps(v, ensure_ascii=False)
-            if len(s) > 400:
-                s = s[:397] + "..."
-            lines.append(f"{k}: {s}")
-    lines.append("")
-
-    lines.append("Session state (serialized snapshot)")
-    lines.append("-" * 40)
-    ss = report.get("session_state", {})
-    # Keep it readable: list keys only, plus a few values
-    try:
-        keys = list(ss.keys())
-        lines.append(f"Keys ({len(keys)}): " + ", ".join(keys[:80]) + (" ..." if len(keys) > 80 else ""))
-    except Exception:
-        lines.append("<unavailable>")
-    return "\n".join(lines)
-
 
 def safe_float(v: Any, default: float) -> float:
     try:
@@ -1733,9 +1559,6 @@ with colC:
     file_png = f"{base_name}_{ts}.png"
     file_svg = f"{base_name}_{ts}.svg"
     file_csv = f"{base_name}_{ts}_summary.csv"
-    file_params_json = f"{base_name}_{ts}_params.json"
-    file_params_txt = f"{base_name}_{ts}_params.txt"
-
 
     # --- Export Style ---
     st.sidebar.markdown("---")
@@ -1782,44 +1605,6 @@ with colC:
     svg_buf.seek(0)
     st.download_button("🧩 Download SVG", data=svg_buf, file_name=file_svg, mime="image/svg+xml", use_container_width=True)
 
-    # --- Parameter Report (JSON/TXT) ---
-    st.markdown("---")
-    st.subheader("🧾 Parameter Report (for reproducibility)")
-
-    try:
-        _locals_for_report = dict(locals())
-        _extra = {
-            "base_name": base_name,
-            "timestamp_tag": ts,
-            "export_files": {
-                "pdf": file_pdf,
-                "png": file_png,
-                "svg": file_svg,
-                "summary_csv_in_zip": file_csv,
-            },
-        }
-        report = build_param_report(locals_dict=_locals_for_report, extra=_extra)
-        json_text = json.dumps(report, ensure_ascii=False, indent=2)
-        txt_text = report_to_txt(report)
-
-        st.download_button(
-            "🧾 Download params (JSON)",
-            data=json_text.encode("utf-8"),
-            file_name=file_params_json,
-            mime="application/json",
-            use_container_width=True,
-        )
-        st.download_button(
-            "🧾 Download params (TXT)",
-            data=txt_text.encode("utf-8"),
-            file_name=file_params_txt,
-            mime="text/plain",
-            use_container_width=True,
-        )
-    except Exception as _e_report:
-        json_text = ""
-        txt_text = ""
-        st.caption(f"Parameter report skipped: {_e_report}")
 
 
     # --- Figure Caption Module v5 ---
@@ -2008,11 +1793,6 @@ with colC:
             zf.writestr(file_caption_renamed, caption_renamed or "")
             # 這裡改抓 session_state 的內容（確保即時更新）
             zf.writestr(file_caption_custom, st.session_state.get("caption_custom", ""))
-            # 匯入 params report (JSON/TXT) — best-effort
-            if json_text:
-                zf.writestr(file_params_json, json_text)
-            if txt_text:
-                zf.writestr(file_params_txt, txt_text)
         all_zip_buf.seek(0)
         st.download_button(
             "📦 Download ALL (ZIP)",
@@ -2029,5 +1809,5 @@ with colC:
 
 
     st.markdown("---")
-    st.caption("v0.9.35 • Added parameter report export (JSON/TXT) + included in ALL.zip.")
+    st.caption("v0.9.34 • Added figure caption generator (eLife default, +PNAS/Nature/Science/Current Biology styles).")
     st.markdown('</div>', unsafe_allow_html=True)
