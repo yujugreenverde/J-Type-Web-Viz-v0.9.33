@@ -1,5 +1,5 @@
-# J-type-like Web Viz v0.10.0 — workflow UI refactor of supplied v0.9.36
-# Run: streamlit run jtype_web_viz_v0_10_0.py
+# J-type-like Web Viz v0.10.1 — workflow UI refactor of supplied v0.9.36
+# Run: streamlit run jtype_web_viz_v0_10_1.py
 # Python >= 3.12; tested dependency versions are in requirements.txt.
 from __future__ import annotations
 import io
@@ -23,7 +23,7 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
-APP_VERSION = '0.10.0'
+APP_VERSION = '0.10.1'
 TEMPLATE_VERSION = 2
 TEMPLATE_FILE_EXT = 'jviz_template.json'
 PALETTE = ['#0072B2', '#E69F00', '#009E73', '#CC79A7', '#56B4E9', '#D55E00', '#000000', '#F0E442']
@@ -1623,7 +1623,7 @@ def main():
         st.caption('Publication-ready figures · Data → Plot → Appearance → Statistics → Export')
     with mode_area:
         mode = st.radio('Controls', ['Basic', 'Advanced'], horizontal=True, key='view_mode', help='Basic collapses fine adjustments; Advanced opens them. Neither resets settings.')
-    with st.expander('Workflow settings · collapse to focus on preview', expanded=True):
+    with st.container():
         tabs = st.tabs(['Data', 'Plot', 'Appearance', 'Statistics', 'Export'])
         panels = [tab.container(height=300, border=True) for tab in tabs]
     with panels[0]:
@@ -1860,7 +1860,8 @@ def main():
         legend_bg_transparent, legend_show_border, legend_border_color, legend_border_width = True, False, '#000000', 1.0
         font_options = ['Arial', 'Helvetica', 'Times New Roman', 'Calibri', 'Liberation Sans', 'DejaVu Sans']
         font_family = ui.selectbox('Global font family', font_options, index=0, key='font_family')
-        with st.expander('🎨 Colors, Shapes & Legend Labels', expanded=mode == 'Advanced'):
+        with st.container(border=True):
+            st.markdown('**Colors, shapes and legend labels**')
             group_colors: Dict[Any, str] = {}
             group_shapes: Dict[Any, str] = {}
             group_labels: Dict[Any, str] = {}
